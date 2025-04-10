@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Live Verification</h2>
+
+<div style="display: flex; flex-direction: column; gap: 16px;">
+  <label>ID Document Scan</label>
+  <video id="idPreview" autoplay playsinline muted></video>
+  <button onclick="captureID()">Capture ID</button>
+  
+  <label>Face Scan</label>
+  <video id="facePreview" autoplay playsinline muted></video>
+  <button onclick="captureFace()">Capture Face</button>
+</div>
+
+<div id="spinner" style="display:none;">
+  <p>Processing verification...</p>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="id_image" id="idImageField">
+  <input type="hidden" name="face_image" id="faceImageField">
+  <button type="submit">Verify Now</button>
+</form>
+
+<script>
+let idStream, faceStream;
+
+mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+
+navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+  document.getElementById("idPreview").srcObject = stream;
+  idStream = stream;
+});
+
+navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+  document.getElementById("facePreview").srcObject = stream;
+  faceStream = stream;
+});
+
+function captureFrame(video) {
+  let canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  return canvas.toDataURL("image/jpeg");
+}
+
+function captureID() {
+  const frame = captureFrame(document.getElementById("idPreview"));
+  document.getElementById("idImageField").value = frame;
+}
+
+function captureFace() {
+  const frame = captureFrame(document.getElementById("facePreview"));
+  document.getElementById("faceImageField").value = frame;
+}
+
+document.querySelector("form").onsubmit = function () {
+document.getElementById("spinner").style.display = "block";
+};
+
+</script>
+
+{% endblock %}
