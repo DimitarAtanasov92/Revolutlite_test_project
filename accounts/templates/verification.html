@@ -26,8 +26,6 @@
 <script>
 let idStream, faceStream;
 
-mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-
 navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
   document.getElementById("idPreview").srcObject = stream;
   idStream = stream;
@@ -39,7 +37,7 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream =>
 });
 
 function captureFrame(video) {
-  let canvas = document.createElement("canvas");
+  const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext("2d").drawImage(video, 0, 0);
@@ -49,17 +47,18 @@ function captureFrame(video) {
 function captureID() {
   const frame = captureFrame(document.getElementById("idPreview"));
   document.getElementById("idImageField").value = frame;
+  alert("✅ ID captured!");
 }
 
 function captureFace() {
   const frame = captureFrame(document.getElementById("facePreview"));
   document.getElementById("faceImageField").value = frame;
+  alert("✅ Face captured!");
 }
 
 document.querySelector("form").onsubmit = function () {
-document.getElementById("spinner").style.display = "block";
+  document.getElementById("spinner").style.display = "block";
 };
-
 </script>
 
 {% endblock %}
