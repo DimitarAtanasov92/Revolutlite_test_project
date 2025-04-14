@@ -1,4 +1,5 @@
 import platform
+from django.conf import settings
 
 if platform.system() != 'Windows':
     import fcntl
