@@ -84,8 +84,8 @@ def real_time_verification_view(request):
         face_img = decode_base64_image(face_img_base64)
 
         # Save temporary image files
-        id_path = f"media/tmp_id_{request.user.id}.jpg"
-        face_path = f"media/tmp_face_{request.user.id}.jpg"
+        id_path = os.path.join(settings.MEDIA_ROOT, f"tmp_id_{request.user.id}.jpg")
+        face_path = os.path.join(settings.MEDIA_ROOT, f"tmp_face_{request.user.id}.jpg")
         cv2.imwrite(id_path, id_img)
         cv2.imwrite(face_path, face_img)
 
