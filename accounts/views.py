@@ -23,7 +23,7 @@ def register_view(request):
             return redirect('dashboard')
     else:
         form = RegisterForm()
-    return render(request, 'register.html', {'form': form})
+        return render(request, 'register.html', {'form': form})
 
 def login_view(request):
     if request.method == 'POST':
