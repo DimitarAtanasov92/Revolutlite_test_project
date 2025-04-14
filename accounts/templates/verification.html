@@ -5,11 +5,13 @@
 <div style="display: flex; flex-direction: column; gap: 16px;">
   <label>ID Document Scan</label>
   <video id="idPreview" autoplay playsinline muted></video>
-  <button onclick="captureID()">Capture ID</button>
-  
+  <button type="button" onclick="captureID()">Capture ID</button>
+  <p id="idStatus" style="color: green; display: none;">✅ ID Captured</p>
+
   <label>Face Scan</label>
   <video id="facePreview" autoplay playsinline muted></video>
-  <button onclick="captureFace()">Capture Face</button>
+  <button type="button" onclick="captureFace()">Capture Face</button>
+  <p id="faceStatus" style="color: green; display: none;">✅ Face Captured</p>
 </div>
 
 <div id="spinner" style="display:none;">
@@ -20,20 +22,19 @@
   {% csrf_token %}
   <input type="hidden" name="id_image" id="idImageField">
   <input type="hidden" name="face_image" id="faceImageField">
-  <button type="submit">Verify Now</button>
+  <button type="submit" id="submitBtn" disabled>Verify Now</button>
 </form>
 
 <script>
-let idStream, faceStream;
+let idCaptured = false;
+let faceCaptured = false;
 
 navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
   document.getElementById("idPreview").srcObject = stream;
-  idStream = stream;
 });
 
 navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
   document.getElementById("facePreview").srcObject = stream;
-  faceStream = stream;
 });
 
 function captureFrame(video) {
@@ -47,18 +48,27 @@ function captureFrame(video) {
 function captureID() {
   const frame = captureFrame(document.getElementById("idPreview"));
   document.getElementById("idImageField").value = frame;
-  alert("✅ ID captured!");
+  document.getElementById("idStatus").style.display = "block";
+  idCaptured = true;
+  checkBothCaptured();
 }
 
 function captureFace() {
   const frame = captureFrame(document.getElementById("facePreview"));
   document.getElementById("faceImageField").value = frame;
-  alert("✅ Face captured!");
+  document.getElementById("faceStatus").style.display = "block";
+  faceCaptured = true;
+  checkBothCaptured();
+}
+
+function checkBothCaptured() {
+  if (idCaptured && faceCaptured) {
+    document.getElementById("submitBtn").disabled = false;
+  }
 }
 
 document.querySelector("form").onsubmit = function () {
   document.getElementById("spinner").style.display = "block";
 };
 </script>
-
 {% endblock %}
