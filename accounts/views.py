@@ -13,6 +13,7 @@ from django.contrib import messages
 from deepface import DeepFace
 import base64
 import numpy as np
+import os
 
 def register_view(request):
     if request.method == 'POST':
