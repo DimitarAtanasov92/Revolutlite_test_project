@@ -26,16 +26,35 @@
 </form>
 
 <script>
-let idCaptured = false;
-let faceCaptured = false;
+let idStream, faceStream;
 
-navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-  document.getElementById("idPreview").srcObject = stream;
-});
+async function startVideoStreams() {
+  try {
+    // ID Camera: Back camera (environment-facing)
+    idStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { exact: "environment" } }
+    });
+    document.getElementById("idPreview").srcObject = idStream;
+  } catch (e) {
+    console.warn("Back camera not available, using default for ID.");
+    idStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    document.getElementById("idPreview").srcObject = idStream;
+  }
 
-navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-  document.getElementById("facePreview").srcObject = stream;
-});
+  try {
+    // Face Camera: Front camera (user-facing)
+    faceStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" }
+    });
+    document.getElementById("facePreview").srcObject = faceStream;
+  } catch (e) {
+    console.warn("Front camera not available, using default for Face.");
+    faceStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    document.getElementById("facePreview").srcObject = faceStream;
+  }
+}
+
+startVideoStreams();
 
 function captureFrame(video) {
   const canvas = document.createElement("canvas");
@@ -45,26 +64,28 @@ function captureFrame(video) {
   return canvas.toDataURL("image/jpeg");
 }
 
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #4caf50; color: white; padding: 10px 20px; border-radius: 8px;
+    z-index: 1000; opacity: 0.95; font-weight: bold;
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
+
 function captureID() {
   const frame = captureFrame(document.getElementById("idPreview"));
   document.getElementById("idImageField").value = frame;
-  document.getElementById("idStatus").style.display = "block";
-  idCaptured = true;
-  checkBothCaptured();
+  showToast("✅ ID captured!");
 }
 
 function captureFace() {
   const frame = captureFrame(document.getElementById("facePreview"));
   document.getElementById("faceImageField").value = frame;
-  document.getElementById("faceStatus").style.display = "block";
-  faceCaptured = true;
-  checkBothCaptured();
-}
-
-function checkBothCaptured() {
-  if (idCaptured && faceCaptured) {
-    document.getElementById("submitBtn").disabled = false;
-  }
+  showToast("✅ Face captured!");
 }
 
 document.querySelector("form").onsubmit = function () {
