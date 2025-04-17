@@ -2,6 +2,8 @@
 {% block content %}
 <h2>Live Verification</h2>
 
+<button onclick="startVideoStreams()">Start Camera</button>
+
 <div style="display: flex; flex-direction: column; gap: 16px;">
   <label>ID Document Scan</label>
   <video id="idPreview" autoplay playsinline muted></video>
@@ -30,27 +32,25 @@ let idStream, faceStream;
 
 async function startVideoStreams() {
   try {
-    // ID Camera: Back camera (environment-facing)
-    idStream = await navigator.mediaDevices.getUserMedia({
+    const idStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { exact: "environment" } }
     });
     document.getElementById("idPreview").srcObject = idStream;
   } catch (e) {
     console.warn("Back camera not available, using default for ID.");
-    idStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    document.getElementById("idPreview").srcObject = idStream;
+    const fallback = await navigator.mediaDevices.getUserMedia({ video: true });
+    document.getElementById("idPreview").srcObject = fallback;
   }
 
   try {
-    // Face Camera: Front camera (user-facing)
-    faceStream = await navigator.mediaDevices.getUserMedia({
+    const faceStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user" }
     });
     document.getElementById("facePreview").srcObject = faceStream;
   } catch (e) {
     console.warn("Front camera not available, using default for Face.");
-    faceStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    document.getElementById("facePreview").srcObject = faceStream;
+    const fallback = await navigator.mediaDevices.getUserMedia({ video: true });
+    document.getElementById("facePreview").srcObject = fallback;
   }
 }
 
