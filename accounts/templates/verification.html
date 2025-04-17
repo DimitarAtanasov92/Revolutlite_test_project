@@ -2,18 +2,16 @@
 {% block content %}
 <h2>Live Verification</h2>
 
-<button onclick="startVideoStreams()">Start Camera</button>
-
 <div style="display: flex; flex-direction: column; gap: 16px;">
   <label>ID Document Scan</label>
   <video id="idPreview" autoplay playsinline muted></video>
-  <button type="button" onclick="captureID()">Capture ID</button>
-  <p id="idStatus" style="color: green; display: none;">✅ ID Captured</p>
-
+  <button onclick="captureID()">Capture ID</button>
+  
   <label>Face Scan</label>
   <video id="facePreview" autoplay playsinline muted></video>
-  <button type="button" onclick="captureFace()">Capture Face</button>
-  <p id="faceStatus" style="color: green; display: none;">✅ Face Captured</p>
+  <button onclick="captureFace()">Capture Face</button>
+  
+  <button onclick="toggleCamera()">Switch Camera</button>
 </div>
 
 <div id="spinner" style="display:none;">
@@ -24,38 +22,54 @@
   {% csrf_token %}
   <input type="hidden" name="id_image" id="idImageField">
   <input type="hidden" name="face_image" id="faceImageField">
-  <button type="submit" id="submitBtn" disabled>Verify Now</button>
+  <button type="submit">Verify Now</button>
 </form>
 
 <script>
-let idStream, faceStream;
+let idStream, faceStream, currentStream, videoTracks = [];
 
-async function startVideoStreams() {
-  try {
-    const idStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { exact: "environment" } }
-    });
-    document.getElementById("idPreview").srcObject = idStream;
-  } catch (e) {
-    console.warn("Back camera not available, using default for ID.");
-    const fallback = await navigator.mediaDevices.getUserMedia({ video: true });
-    document.getElementById("idPreview").srcObject = fallback;
-  }
+// Request access to the user's camera and stream it to the video elements
+async function setupCamera(videoElement, isFaceScan) {
+  const constraints = {
+    video: {
+      facingMode: isFaceScan ? 'user' : 'environment', // Default to front camera for face scan, back for ID
+    }
+  };
 
   try {
-    const faceStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" }
-    });
-    document.getElementById("facePreview").srcObject = faceStream;
-  } catch (e) {
-    console.warn("Front camera not available, using default for Face.");
-    const fallback = await navigator.mediaDevices.getUserMedia({ video: true });
-    document.getElementById("facePreview").srcObject = fallback;
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    videoElement.srcObject = stream;
+
+    // If it's the face scan, store it for later use
+    if (isFaceScan) {
+      faceStream = stream;
+    } else {
+      idStream = stream;
+    }
+
+    // Store video tracks for possible camera switch
+    videoTracks = stream.getVideoTracks();
+  } catch (err) {
+    console.error("Error accessing camera: ", err);
   }
 }
 
-startVideoStreams();
+// Switch between front and rear cameras
+async function toggleCamera() {
+  if (videoTracks.length === 0) return;
 
+  // Stop all currently active video tracks
+  videoTracks.forEach(track => track.stop());
+
+  // Toggle between front and back camera
+  const isFrontCamera = videoTracks[0].getConstraints().facingMode === 'user';
+  const newFacingMode = isFrontCamera ? 'environment' : 'user';
+
+  // Setup camera with the new facing mode
+  await setupCamera(isFrontCamera ? document.getElementById('idPreview') : document.getElementById('facePreview'), !isFrontCamera);
+}
+
+// Capture an image from a video stream
 function captureFrame(video) {
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
@@ -64,32 +78,27 @@ function captureFrame(video) {
   return canvas.toDataURL("image/jpeg");
 }
 
-function showToast(message) {
-  const toast = document.createElement("div");
-  toast.textContent = message;
-  toast.style.cssText = `
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: #4caf50; color: white; padding: 10px 20px; border-radius: 8px;
-    z-index: 1000; opacity: 0.95; font-weight: bold;
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2000);
-}
-
 function captureID() {
   const frame = captureFrame(document.getElementById("idPreview"));
   document.getElementById("idImageField").value = frame;
-  showToast("✅ ID captured!");
+  alert("✅ ID captured!");
 }
 
 function captureFace() {
   const frame = captureFrame(document.getElementById("facePreview"));
   document.getElementById("faceImageField").value = frame;
-  showToast("✅ Face captured!");
+  alert("✅ Face captured!");
 }
 
 document.querySelector("form").onsubmit = function () {
   document.getElementById("spinner").style.display = "block";
 };
+
+// Initialize video streams when the page loads
+window.onload = function () {
+  setupCamera(document.getElementById("idPreview"), false); // Set up ID camera (back camera)
+  setupCamera(document.getElementById("facePreview"), true); // Set up Face camera (front camera)
+};
 </script>
+
 {% endblock %}
