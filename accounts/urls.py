@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import real_time_verification_view
+from .views import verification_view
 
 urlpatterns = [
     path('dashboard/', views.dashboard_view, name='dashboard'),
