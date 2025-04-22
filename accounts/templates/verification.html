@@ -3,73 +3,46 @@
 <h2>Live Verification</h2>
 
 <div style="display: flex; flex-direction: column; gap: 16px;">
-  <label>ID Document Scan</label>
+  <label>ID Document</label>
   <video id="idPreview" autoplay playsinline muted></video>
-  <button onclick="captureID()">Capture ID</button>
-  
+  <button onclick="captureID()">📸 Capture ID</button>
+
   <label>Face Scan</label>
   <video id="facePreview" autoplay playsinline muted></video>
-  <button onclick="captureFace()">Capture Face</button>
-  
-  <button onclick="toggleCamera()">Switch Camera</button>
+  <button onclick="captureFace()">📸 Capture Face</button>
+
+  <button onclick="toggleCamera()">🔁 Switch Camera</button>
 </div>
 
 <div id="spinner" style="display:none;">
-  <p>Processing verification...</p>
+  <p>⏳ Processing verification...</p>
 </div>
 
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="id_image" id="idImageField">
   <input type="hidden" name="face_image" id="faceImageField">
-  <button type="submit">Verify Now</button>
+  <button type="submit">✅ Verify Now</button>
 </form>
 
 <script>
-let idStream, faceStream, currentStream, videoTracks = [];
+let videoTracks = [];
+let currentFacingMode = 'environment';
 
-// Request access to the user's camera and stream it to the video elements
-async function setupCamera(videoElement, isFaceScan) {
-  const constraints = {
-    video: {
-      facingMode: isFaceScan ? 'user' : 'environment', // Default to front camera for face scan, back for ID
-    }
-  };
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    videoElement.srcObject = stream;
-
-    // If it's the face scan, store it for later use
-    if (isFaceScan) {
-      faceStream = stream;
-    } else {
-      idStream = stream;
-    }
-
-    // Store video tracks for possible camera switch
-    videoTracks = stream.getVideoTracks();
-  } catch (err) {
-    console.error("Error accessing camera: ", err);
+async function setupCamera(videoElement, facingMode) {
+  if (videoTracks.length) {
+    videoTracks.forEach(track => track.stop());
   }
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: facingMode }
+  });
+
+  videoElement.srcObject = stream;
+  videoTracks = stream.getVideoTracks();
+  currentFacingMode = facingMode;
 }
 
-// Switch between front and rear cameras
-async function toggleCamera() {
-  if (videoTracks.length === 0) return;
-
-  // Stop all currently active video tracks
-  videoTracks.forEach(track => track.stop());
-
-  // Toggle between front and back camera
-  const isFrontCamera = videoTracks[0].getConstraints().facingMode === 'user';
-  const newFacingMode = isFrontCamera ? 'environment' : 'user';
-
-  // Setup camera with the new facing mode
-  await setupCamera(isFrontCamera ? document.getElementById('idPreview') : document.getElementById('facePreview'), !isFrontCamera);
-}
-
-// Capture an image from a video stream
 function captureFrame(video) {
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
@@ -79,26 +52,28 @@ function captureFrame(video) {
 }
 
 function captureID() {
-  const frame = captureFrame(document.getElementById("idPreview"));
-  document.getElementById("idImageField").value = frame;
+  document.getElementById("idImageField").value = captureFrame(document.getElementById("idPreview"));
   alert("✅ ID captured!");
 }
 
 function captureFace() {
-  const frame = captureFrame(document.getElementById("facePreview"));
-  document.getElementById("faceImageField").value = frame;
+  document.getElementById("faceImageField").value = captureFrame(document.getElementById("facePreview"));
   alert("✅ Face captured!");
+}
+
+async function toggleCamera() {
+  const newMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+  setupCamera(document.getElementById("idPreview"), newMode);
+  setupCamera(document.getElementById("facePreview"), newMode);
 }
 
 document.querySelector("form").onsubmit = function () {
   document.getElementById("spinner").style.display = "block";
 };
 
-// Initialize video streams when the page loads
-window.onload = function () {
-  setupCamera(document.getElementById("idPreview"), false); // Set up ID camera (back camera)
-  setupCamera(document.getElementById("facePreview"), true); // Set up Face camera (front camera)
+window.onload = () => {
+  setupCamera(document.getElementById("idPreview"), 'environment');
+  setupCamera(document.getElementById("facePreview"), 'user');
 };
 </script>
-
 {% endblock %}
