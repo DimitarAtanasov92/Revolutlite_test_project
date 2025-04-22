@@ -54,6 +54,12 @@ def dashboard_view(request):
     return render(request, 'dashboard.html')
 
 
+def decode_base64_image(data_url):
+    header, encoded = data_url.split(',', 1)
+    binary_data = base64.b64decode(encoded)
+    np_arr = np.frombuffer(binary_data, dtype=np.uint8)
+    return cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
 def detect_id_card(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -63,7 +69,6 @@ def detect_id_card(image):
     for c in contours:
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-
         if len(approx) == 4:
             x, y, w, h = cv2.boundingRect(approx)
             aspect_ratio = w / float(h)
@@ -71,27 +76,19 @@ def detect_id_card(image):
                 return True
     return False
 
-
 @login_required
-def real_time_verification_view(request):
+def verification_view(request):
     if request.method == 'POST':
         id_img_base64 = request.POST.get("id_image")
         face_img_base64 = request.POST.get("face_image")
 
         if not id_img_base64 or not face_img_base64:
-            messages.error(request, "Both ID and face images are required.")
+            messages.error(request, "Please capture both ID and face images.")
             return redirect("verify")
-
-        def decode_base64_image(data_url):
-            header, encoded = data_url.split(',', 1)
-            binary_data = base64.b64decode(encoded)
-            np_arr = np.frombuffer(binary_data, dtype=np.uint8)
-            return cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
         id_img = decode_base64_image(id_img_base64)
         face_img = decode_base64_image(face_img_base64)
 
-        # Save to temp files for DeepFace
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as id_file, \
              tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as face_file:
 
@@ -99,40 +96,37 @@ def real_time_verification_view(request):
             cv2.imwrite(face_file.name, face_img)
 
             try:
-                # OCR
                 text_fields = extract_text_fields(id_file.name)
-                request.user.full_name = text_fields.get('full_name', '')
-                request.user.birth_date = text_fields.get('birth_date', '')
-                request.user.document_number = text_fields.get('document_number', '')
-                request.user.issue_date = text_fields.get('issue_date', '')
 
-                # Face verification
+                request.user.full_name = text_fields.get('full_name')
+                request.user.birth_date = text_fields.get('birth_date')
+                request.user.document_number = text_fields.get('document_number')
+                request.user.issue_date = text_fields.get('issue_date')
+
                 result = DeepFace.verify(img1_path=id_file.name, img2_path=face_file.name)
                 request.user.confidence_score = round((1 - result['distance']) * 100, 2)
                 request.user.is_verified = result['verified']
 
-                # Detect ID presence
                 id_detected = detect_id_card(id_img)
                 if not id_detected:
-                    messages.warning(request, "⚠️ No valid ID card detected.")
                     request.user.is_verified = False
                     request.user.needs_manual_review = True
+                    messages.warning(request, "⚠️ No valid ID card detected.")
 
-                # Liveness detection - NOTE: This only works if you upload video. Here we simulate failure
+                # Liveness check skipped (still image)
                 request.user.liveness_checked = False
-                messages.warning(request, "Liveness check skipped (still image provided).")
                 request.user.needs_manual_review = True
+                messages.info(request, "Liveness check skipped.")
 
                 request.user.save()
 
                 if request.user.is_verified:
                     messages.success(request, "✅ Verification successful!")
-                elif request.user.needs_manual_review:
-                    messages.warning(request, "⏳ Your verification is under manual review.")
+                else:
+                    messages.warning(request, "⏳ Verification submitted for manual review.")
 
             except Exception as e:
-                messages.error(request, f"❌ Verification error: {e}")
-
+                messages.error(request, f"❌ Error: {e}")
             finally:
                 os.remove(id_file.name)
                 os.remove(face_file.name)
@@ -140,45 +134,3 @@ def real_time_verification_view(request):
         return redirect("dashboard")
 
     return render(request, "verification.html")
-
-
-# Optional: liveness check placeholder (requires video input to work properly)
-def detect_liveness(video_path):
-    cap = cv2.VideoCapture(video_path)
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
-
-    frame_count = 0
-    face_detected = 0
-    eyes_opened = 0
-    motion_detected = False
-    prev_face = None
-
-    while True:
-        ret, frame = cap.read()
-        if not ret or frame_count > 60:
-            break
-
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-
-        if len(faces) > 0:
-            face_detected += 1
-            (x, y, w, h) = faces[0]
-            roi_gray = gray[y:y+h, x:x+w]
-            eyes = eye_cascade.detectMultiScale(roi_gray)
-            if len(eyes) >= 1:
-                eyes_opened += 1
-
-            if prev_face:
-                dx = abs(prev_face[0] - x)
-                dy = abs(prev_face[1] - y)
-                if dx > 5 or dy > 5:
-                    motion_detected = True
-            prev_face = (x, y)
-
-        frame_count += 1
-
-    cap.release()
-    blink_detected = 0 < face_detected and eyes_opened < face_detected
-    return blink_detected and motion_detected
